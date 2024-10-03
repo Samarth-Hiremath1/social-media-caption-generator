@@ -173,8 +173,8 @@ export default function Home() {
               onClick={generateCaption}
               disabled={!isFormValid || loading}
               className={`w-full ${isFormValid
-                  ? 'bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600'
-                  : 'bg-gray-600 cursor-not-allowed'
+                ? 'bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600'
+                : 'bg-gray-600 cursor-not-allowed'
                 }`}
             >
               {loading ? 'Generating...' : 'Generate Caption'}
@@ -199,31 +199,34 @@ export default function Home() {
                     <Card>
                       <CardContent className="p-4 bg-gray-700 rounded-lg">
                         <div className="flex flex-wrap gap-2">
-                          {hashtags.map((tag, index) => (
-                            <span key={index} className="bg-gray-600 px-2 py-1 rounded-full text-sm flex items-center">
-                              <Hash className="w-3 h-3 mr-1" />
-                              {tag}
-                            </span>
-                          ))}
+                          {hashtags.length > 0 ? (
+                            hashtags.map((tag, index) => (
+                              <span key={index} className="bg-gray-600 px-2 py-1 rounded-full text-sm flex items-center">
+                                <Hash className="w-3 h-3 mr-1" />
+                                {tag}
+                              </span>
+                            ))
+                          ) : (
+                            <p>No hashtags available</p>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
                   </TabsContent>
+
                   <TabsContent value="tips">
                     <Card>
                       <CardContent className="p-4 bg-gray-700 rounded-lg">
                         <ul className="list-disc list-inside space-y-2">
                           {tips && tips.length > 0 ? (
-                            <ul className="list-disc list-inside space-y-2">
-                              {tips.map((tip, index) => (
-                                <li key={index} className="flex items-start">
-                                  <Lightbulb className="w-4 h-4 mr-2 mt-1 flex-shrink-0" />
-                                  <span>{tip}</span>
-                                </li>
-                              ))}
-                            </ul>
+                            tips.map((tip, index) => (
+                              <li key={index} className="flex items-start">
+                                <Lightbulb className="w-4 h-4 mr-2 mt-1 flex-shrink-0" />
+                                <span>{tip}</span>
+                              </li>
+                            ))
                           ) : (
-                            <p>No tips available</p>  // Optionally handle the case when no tips are returned
+                            <p>No tips available</p>
                           )}
                         </ul>
                       </CardContent>
