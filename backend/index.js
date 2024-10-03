@@ -1,5 +1,6 @@
 const express = require('express');
 const multer = require('multer');
+const vision = require('@google-cloud/vision');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const cors = require('cors');
 require('dotenv').config();
@@ -15,9 +16,13 @@ const upload = multer({ storage });
 
 app.use(express.json());
 
+// Initialize Google Cloud Vision client
+const visionClient = new vision.ImageAnnotatorClient();
+
+// Initialize Google Generative AI client (Gemini)
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Route to handle image upload and caption generation
+// Route to handle image upload, image analysis, and caption generation
 app.post('/upload', upload.single('image'), async (req, res) => {
   const { platform, length, tone, description } = req.body;
 
@@ -26,27 +31,56 @@ app.post('/upload', upload.single('image'), async (req, res) => {
       return res.status(400).json({ error: 'No file uploaded.' });
     }
 
-    const imageBuffer = req.file.buffer;  // Access uploaded image buffer
-    // Log to check that the image is uploaded
+    const imageBuffer = req.file.buffer;
     console.log("Image uploaded:", req.file.originalname);
 
-    // Simulate an image description task using the Gemini API
-    const imageAnalysis = await genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const imageDescription = await imageAnalysis.generateContent([
-      `Describe this image in detail: ${description || "No description provided"}`
-    ]);
+    // Step 1: Analyze the image using Google Cloud Vision API
+    const [visionResult] = await visionClient.labelDetection({
+      image: { content: imageBuffer },
+    });
 
-    const captionPrompt = `Generate a ${tone} caption for this image described as '${imageDescription.response.text()}', for the ${platform} platform. Make it ${length}.`;
+    if (!visionResult.labelAnnotations || visionResult.labelAnnotations.length === 0) {
+      return res.status(500).json({ error: 'Failed to analyze image' });
+    }
 
-    const captionResult = await imageAnalysis.generateContent([captionPrompt]);
+    const labels = visionResult.labelAnnotations.map(label => label.description).join(', ');
+    console.log('Labels extracted from image:', labels);
+
+    // Step 2: Generate a caption using Gemini API based on the image labels
+    const captionPrompt = `Generate a ${tone} caption based on the following image description: '${labels}', for the ${platform} platform. The caption should be ${length} in length.`;
+    const captionResult = await genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const captionResponse = await captionResult.generateContent([captionPrompt]);
+
+    if (!captionResponse || !captionResponse.response) {
+      return res.status(500).json({ error: 'Failed to generate caption' });
+    }
+
+    console.log("Caption generated:", captionResponse.response.text());
 
     // Generate hashtags based on the caption
-    const hashtagPrompt = `Generate relevant hashtags for this image caption: '${captionResult.response.text()}'`;
-    const hashtagResult = await imageAnalysis.generateContent([hashtagPrompt]);
+    const hashtagPrompt = `Generate a list of relevant hashtags for the following caption. Only provide the hashtags: '${captionResponse.response.text()}'.`;
+    const hashtagResult = await captionResult.generateContent([hashtagPrompt]);
+
+    if (!hashtagResult || !hashtagResult.response) {
+      return res.status(500).json({ error: 'Failed to generate hashtags' });
+    }
+
+    console.log("Hashtags generated:", hashtagResult.response.text());
+
+    // Step 3: Generate tips for improving social media captions
+    const tipsPrompt = `Provide just a list of tips only on how to improve this caption for ${platform}: '${captionResponse.response.text()}'. Only provide the tips.`;
+    const tipsResult = await captionResult.generateContent([tipsPrompt]);
+
+    if (!tipsResult || !tipsResult.response) {
+      return res.status(500).json({ error: 'Failed to generate tips' });
+    }
+
+    console.log("Tips generated:", tipsResult.response.text());
 
     res.json({
-      caption: captionResult.response.text(),
-      hashtags: hashtagResult.response.text().split(" "),  // Simulate hashtags generation
+      caption: captionResponse.response.text(),
+      hashtags: hashtagResult.response.text().split(" "),  // Split hashtags into an array
+      tips: tipsResult.response.text().split(". "), // Split tips by period into an array
     });
 
   } catch (error) {
