@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Upload, RefreshCw, Image as ImageIcon } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Upload, RefreshCw, Image as ImageIcon, Hash, Lightbulb } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -9,11 +9,23 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default function Home() {
   const [image, setImage] = useState<string | null>(null)
   const [caption, setCaption] = useState<string>('')
+  const [hashtags, setHashtags] = useState<string[]>([])
+  const [tips, setTips] = useState<string[]>([])
   const [loading, setLoading] = useState<boolean>(false)
+  const [platform, setPlatform] = useState<string>('instagram')
+  const [length, setLength] = useState<string>('')
+  const [tone, setTone] = useState<string>('')
+  const [description, setDescription] = useState<string>('')
+  const [isFormValid, setIsFormValid] = useState<boolean>(false)
+
+  useEffect(() => {
+    setIsFormValid(!!image && !!platform && !!length && !!tone)
+  }, [image, platform, length, tone])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -26,14 +38,39 @@ export default function Home() {
     }
   }
 
-  const generateCaption = () => {
-    setLoading(true)
-    // Simulating API call for caption generation
-    setTimeout(() => {
-      setCaption("Your amazing caption goes here! #awesome #socialmedia")
-      setLoading(false)
-    }, 2000)
-  }
+  const generateCaption = async () => {
+    if (!image) return;
+    setLoading(true);
+  
+    const formData = new FormData();
+    formData.append('image', image);
+    formData.append('platform', platform);
+    formData.append('length', length);
+    formData.append('tone', tone);
+    formData.append('description', description);
+  
+    try {
+      const response = await fetch('http://localhost:5001/upload', {
+        method: 'POST',
+        body: formData,
+      });
+  
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate content.');
+      }
+  
+      const data = await response.json();
+      setCaption(data.caption);
+      setHashtags(data.hashtags);
+      setTips(data.tips);
+    } catch (error) {
+      console.error('Error generating content:', (error as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4 sm:p-8">
@@ -78,7 +115,7 @@ export default function Home() {
 
             <div className="space-y-2">
               <Label>Select Platform</Label>
-              <RadioGroup defaultValue="instagram" className="flex space-x-4">
+              <RadioGroup defaultValue="instagram" className="flex space-x-4" onValueChange={setPlatform}>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="instagram" id="instagram" />
                   <Label htmlFor="instagram">Instagram</Label>
@@ -96,7 +133,7 @@ export default function Home() {
 
             <div className="space-y-2">
               <Label htmlFor="length">Caption Length</Label>
-              <Select>
+              <Select onValueChange={setLength}>
                 <SelectTrigger className="bg-gray-700 border-gray-600">
                   <SelectValue placeholder="Select length" />
                 </SelectTrigger>
@@ -110,7 +147,7 @@ export default function Home() {
 
             <div className="space-y-2">
               <Label htmlFor="tone">Caption Tone</Label>
-              <Select>
+              <Select onValueChange={setTone}>
                 <SelectTrigger className="bg-gray-700 border-gray-600">
                   <SelectValue placeholder="Select tone" />
                 </SelectTrigger>
@@ -129,23 +166,66 @@ export default function Home() {
                 id="description"
                 placeholder="Describe your image here..."
                 className="bg-gray-700 border-gray-600 text-white"
+                onChange={(e) => setDescription(e.target.value)}
               />
             </div>
 
             <Button 
               onClick={generateCaption} 
-              disabled={!image || loading} 
-              className="w-full bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600"
+              disabled={!isFormValid || loading}
+              className={`w-full ${
+                isFormValid
+                  ? 'bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600'
+                  : 'bg-gray-600 cursor-not-allowed'
+              }`}
             >
               {loading ? 'Generating...' : 'Generate Caption'}
             </Button>
 
             {caption && (
-              <div className="space-y-2">
-                <Label>Generated Caption</Label>
-                <div className="p-4 bg-gray-700 rounded-lg">
-                  <p>{caption}</p>
-                </div>
+              <div className="space-y-4">
+                <Tabs defaultValue="caption" className="w-full">
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="caption">Caption</TabsTrigger>
+                    <TabsTrigger value="hashtags">Hashtags</TabsTrigger>
+                    <TabsTrigger value="tips">Tips</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="caption">
+                    <Card>
+                      <CardContent className="p-4 bg-gray-700 rounded-lg">
+                        <p>{caption}</p>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                  <TabsContent value="hashtags">
+                    <Card>
+                      <CardContent className="p-4 bg-gray-700 rounded-lg">
+                        <div className="flex flex-wrap gap-2">
+                          {hashtags.map((tag, index) => (
+                            <span key={index} className="bg-gray-600 px-2 py-1 rounded-full text-sm flex items-center">
+                              <Hash className="w-3 h-3 mr-1" />
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                  <TabsContent value="tips">
+                    <Card>
+                      <CardContent className="p-4 bg-gray-700 rounded-lg">
+                        <ul className="list-disc list-inside space-y-2">
+                          {tips.map((tip, index) => (
+                            <li key={index} className="flex items-start">
+                              <Lightbulb className="w-4 h-4 mr-2 mt-1 flex-shrink-0" />
+                              <span>{tip}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                </Tabs>
                 <Button onClick={generateCaption} variant="outline" className="w-full">
                   <RefreshCw className="w-4 h-4 mr-2" />
                   Regenerate Caption
