@@ -12,65 +12,64 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default function Home() {
-  const [image, setImage] = useState<string | null>(null)
-  const [caption, setCaption] = useState<string>('')
-  const [hashtags, setHashtags] = useState<string[]>([])
-  const [tips, setTips] = useState<string[]>([])
-  const [loading, setLoading] = useState<boolean>(false)
-  const [platform, setPlatform] = useState<string>('instagram')
-  const [length, setLength] = useState<string>('')
-  const [tone, setTone] = useState<string>('')
-  const [description, setDescription] = useState<string>('')
-  const [isFormValid, setIsFormValid] = useState<boolean>(false)
+  const [image, setImage] = useState<File | null>(null); // Use File object instead of base64
+  const [caption, setCaption] = useState<string>('');
+  const [hashtags, setHashtags] = useState<string[]>([]);
+  const [tips, setTips] = useState<string[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [platform, setPlatform] = useState<string>('instagram');
+  const [length, setLength] = useState<string>('');
+  const [tone, setTone] = useState<string>('');
+  const [description, setDescription] = useState<string>('');
+  const [isFormValid, setIsFormValid] = useState<boolean>(false);
 
   useEffect(() => {
-    setIsFormValid(!!image && !!platform && !!length && !!tone)
-  }, [image, platform, length, tone])
+    setIsFormValid(!!image && !!platform && !!length && !!tone);
+  }, [image, platform, length, tone]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
+    const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setImage(reader.result as string)
-      }
-      reader.readAsDataURL(file)
+      setImage(file);  // Store the actual File object, not base64
     }
-  }
+  };
 
   const generateCaption = async () => {
     if (!image) return;
     setLoading(true);
-  
+
     const formData = new FormData();
-    formData.append('image', image);
+    formData.append('image', image);  // Upload the actual file object
     formData.append('platform', platform);
     formData.append('length', length);
     formData.append('tone', tone);
     formData.append('description', description);
-  
+
     try {
       const response = await fetch('http://localhost:5001/upload', {
         method: 'POST',
         body: formData,
       });
-  
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to generate content.');
       }
-  
+
       const data = await response.json();
       setCaption(data.caption);
       setHashtags(data.hashtags);
       setTips(data.tips);
     } catch (error) {
-      console.error('Error generating content:', (error as Error).message);
+      if (error instanceof Error) {
+        console.error('Error generating content:', error.message);
+      } else {
+        console.error('Error generating content:', error);
+      }
     } finally {
       setLoading(false);
     }
   };
-  
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4 sm:p-8">
@@ -104,7 +103,7 @@ export default function Home() {
 
             {image && (
               <div className="aspect-square rounded-lg overflow-hidden bg-gray-700 flex items-center justify-center">
-                <img src={image} alt="Uploaded" className="max-w-full max-h-full object-contain" />
+                <img src={URL.createObjectURL(image)} alt="Uploaded" className="max-w-full max-h-full object-contain" />
               </div>
             )}
             {!image && (
@@ -170,14 +169,13 @@ export default function Home() {
               />
             </div>
 
-            <Button 
-              onClick={generateCaption} 
+            <Button
+              onClick={generateCaption}
               disabled={!isFormValid || loading}
-              className={`w-full ${
-                isFormValid
+              className={`w-full ${isFormValid
                   ? 'bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600'
                   : 'bg-gray-600 cursor-not-allowed'
-              }`}
+                }`}
             >
               {loading ? 'Generating...' : 'Generate Caption'}
             </Button>
@@ -215,12 +213,18 @@ export default function Home() {
                     <Card>
                       <CardContent className="p-4 bg-gray-700 rounded-lg">
                         <ul className="list-disc list-inside space-y-2">
-                          {tips.map((tip, index) => (
-                            <li key={index} className="flex items-start">
-                              <Lightbulb className="w-4 h-4 mr-2 mt-1 flex-shrink-0" />
-                              <span>{tip}</span>
-                            </li>
-                          ))}
+                          {tips && tips.length > 0 ? (
+                            <ul className="list-disc list-inside space-y-2">
+                              {tips.map((tip, index) => (
+                                <li key={index} className="flex items-start">
+                                  <Lightbulb className="w-4 h-4 mr-2 mt-1 flex-shrink-0" />
+                                  <span>{tip}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p>No tips available</p>  // Optionally handle the case when no tips are returned
+                          )}
                         </ul>
                       </CardContent>
                     </Card>
