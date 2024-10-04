@@ -13,7 +13,7 @@ export default function CaptionToneSelector({ setTone }: CaptionToneSelectorProp
         <SelectTrigger className="bg-gray-700 border-gray-600">
           <SelectValue placeholder="Select tone" />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="bg-white border border-navy-900">
           <SelectItem value="casual">Casual</SelectItem>
           <SelectItem value="professional">Professional</SelectItem>
           <SelectItem value="humorous">Humorous</SelectItem>

@@ -74,8 +74,11 @@ export default function Home() {
     <div className="min-h-screen bg-gray-900 text-white p-4 sm:p-8">
       <div className="max-w-2xl mx-auto space-y-8">
         <h1 className="text-4xl font-bold text-center bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 text-transparent bg-clip-text">
-          Social Media Caption Generator
+          PostPal
         </h1>
+        <h2 className="text-xl font-medium text-center text-white italic">
+          Your personal Social Media Caption Generator
+        </h2>
 
         <Card className="bg-gray-800 border-gray-700">
           <CardContent className="p-6 space-y-6">

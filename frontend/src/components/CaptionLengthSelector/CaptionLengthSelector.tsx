@@ -13,7 +13,7 @@ export default function CaptionLengthSelector({ setLength }: CaptionLengthSelect
         <SelectTrigger className="bg-gray-700 border-gray-600">
           <SelectValue placeholder="Select length" />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="bg-white border border-navy-900">
           <SelectItem value="short">Short</SelectItem>
           <SelectItem value="medium">Medium</SelectItem>
           <SelectItem value="long">Long</SelectItem>
