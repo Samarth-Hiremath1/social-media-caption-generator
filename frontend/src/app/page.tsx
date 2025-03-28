@@ -10,6 +10,7 @@ import GeneratedContent from '../components/GeneratedContent/GeneratedContent';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import * as Toast from '@radix-ui/react-toast';
+import * as Dialog from '@radix-ui/react-dialog';
 
 export default function Home() {
   const [image, setImage] = useState<File | null>(null);
@@ -32,9 +33,14 @@ export default function Home() {
   }, [image, platform, length, tone]);
 
   const fetchUser = async () => {
-    const response = await fetch('http://localhost:5001/auth/user', { credentials: 'include' });
-    const data = await response.json();
-    setUser(data.user);
+    try {
+      const response = await fetch('http://localhost:5001/auth/user', { credentials: 'include' });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      setUser(data.user);
+    } catch (error) {
+      console.error('Failed to fetch user:', error);
+    }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -97,53 +103,102 @@ export default function Home() {
             Your personal Social Media Caption Generator
           </h2>
 
-          <div className="flex justify-between">
-            {user ? (
-              <>
-                <span>Welcome, {user.name}!</span>
-                <Button onClick={() => window.location.href = 'http://localhost:5001/auth/logout'}>
+          {user ? (
+            <>
+              <div className="flex justify-between items-center">
+                <span className="text-lg">Welcome, {user.name}!</span>
+                <Button
+                  variant="outline"
+                  className="bg-gray-800 text-white border-gray-600 hover:bg-gray-700"
+                  onClick={() => window.location.href = 'http://localhost:5001/auth/logout'}
+                >
                   Logout
                 </Button>
-              </>
-            ) : (
-              <Button onClick={() => window.location.href = 'http://localhost:5001/auth/google'}>
-                Login with Google
-              </Button>
-            )}
-          </div>
+              </div>
 
-          {user ? (
-            <Card className="bg-gray-800 border-gray-700">
-              <CardContent className="p-6 space-y-6">
-                <ImageUpload image={image} handleImageUpload={handleImageUpload} />
-                <PlatformSelector setPlatform={setPlatform} />
-                <CaptionLengthSelector setLength={setLength} />
-                <CaptionToneSelector setTone={setTone} />
-                <ImageDescription setDescription={setDescription} />
+              <Card className="bg-gray-800 border-gray-700">
+                <CardContent className="p-6 space-y-6">
+                  <ImageUpload image={image} handleImageUpload={handleImageUpload} />
+                  <PlatformSelector setPlatform={setPlatform} />
+                  <CaptionLengthSelector setLength={setLength} />
+                  <CaptionToneSelector setTone={setTone} />
+                  <ImageDescription setDescription={setDescription} />
 
-                <Button
-                  onClick={generateCaption}
-                  disabled={!isFormValid || loading}
-                  className={`w-full ${isFormValid
-                    ? 'bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600'
-                    : 'bg-gray-600 cursor-not-allowed'
-                    }`}
-                >
-                  {loading ? 'Generating...' : 'Generate Caption'}
-                </Button>
+                  <Button
+                    onClick={generateCaption}
+                    disabled={!isFormValid || loading}
+                    className={`w-full ${isFormValid
+                      ? 'bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600'
+                      : 'bg-gray-600 cursor-not-allowed'
+                      }`}
+                  >
+                    {loading ? 'Generating...' : 'Generate Caption'}
+                  </Button>
 
-                {caption && (
-                  <GeneratedContent
-                    caption={caption}
-                    hashtags={hashtags}
-                    tips={tips}
-                    generateCaption={generateCaption}
-                  />
-                )}
-              </CardContent>
-            </Card>
+                  {caption && (
+                    <GeneratedContent
+                      caption={caption}
+                      hashtags={hashtags}
+                      tips={tips}
+                      generateCaption={generateCaption}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            </>
           ) : (
-            <p className="text-center">Please log in to generate captions.</p>
+            <div className="text-center space-y-6">
+              <p className="text-lg text-gray-300">
+                PostPal helps you create perfect captions for your social media posts using AI-powered image analysis. Upload an image, choose your platform, and get tailored captions, hashtags, and tips!
+              </p>
+              <p className="text-sm text-gray-400">
+                You need to log in to access the platform and start generating captions.
+              </p>
+
+              <Dialog.Root>
+                <Dialog.Trigger asChild>
+                  <div className="flex justify-center">
+                    <Button
+                      className="flex items-center gap-2 bg-white text-gray-900 font-medium py-2 px-4 rounded shadow-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-1.04.69-2.37 1.1-3.71 1.1-2.86 0-5.28-1.93-6.15-4.53H1.5v2.84C3.31 20.36 7.14 23 12 23z" />
+                        <path fill="#FBBC05" d="M5.85 14.47c-.23-.69-.36-1.43-.36-2.22s.13-1.53.36-2.22V7.19H1.5C.54 8.97 0 10.95 0 13s.54 4.03 1.5 5.81l4.35-4.34z" />
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.14 1 3.31 3.64 1.5 7.19l4.35 4.34C6.72 8.93 9.14 7 12 5.38z" />
+                      </svg>
+                      Sign in with Google
+                    </Button>
+                  </div>
+                </Dialog.Trigger>
+
+                <Dialog.Portal>
+                  <Dialog.Overlay className="fixed inset-0 bg-black/50" />
+                  <Dialog.Content className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gray-800 p-6 rounded-lg shadow-lg max-w-md w-full">
+                    <Dialog.Title className="text-xl font-semibold text-white">
+                      Welcome to PostPal
+                    </Dialog.Title>
+                    <Dialog.Description className="mt-2 text-gray-300">
+                      Sign in with your Google account to start generating captions for your social media posts.
+                    </Dialog.Description>
+                    <div className="mt-6 flex justify-center">
+                      <Button
+                        onClick={() => window.location.href = 'http://localhost:5001/auth/google'}
+                        className="flex items-center gap-2 bg-white text-gray-900 font-medium py-2 px-4 rounded shadow-md hover:bg-gray-100"
+                      >
+                        <svg className="w-5 h-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-1.04.69-2.37 1.1-3.71 1.1-2.86 0-5.28-1.93-6.15-4.53H1.5v2.84C3.31 20.36 7.14 23 12 23z" />
+                          <path fill="#FBBC05" d="M5.85 14.47c-.23-.69-.36-1.43-.36-2.22s.13-1.53.36-2.22V7.19H1.5C.54 8.97 0 10.95 0 13s.54 4.03 1.5 5.81l4.35-4.34z" />
+                          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.14 1 3.31 3.64 1.5 7.19l4.35 4.34C6.72 8.93 9.14 7 12 5.38z" />
+                        </svg>
+                        Sign in with Google
+                      </Button>
+                    </div>
+                  </Dialog.Content>
+                </Dialog.Portal>
+              </Dialog.Root>
+            </div>
           )}
         </div>
       </div>
