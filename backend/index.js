@@ -37,6 +37,11 @@ app.post('/upload', upload.single('image'), async (req, res) => {
     // Step 1: Analyze the image using Google Cloud Vision API
     const [visionResult] = await visionClient.labelDetection({
       image: { content: imageBuffer },
+    }).catch(error => {
+      if (error.code === 7 && error.message.includes('PERMISSION_DENIED')) {
+        throw new Error('API_CREDITS_EXHAUSTED');
+      }
+      throw error;
     });
 
     if (!visionResult.labelAnnotations || visionResult.labelAnnotations.length === 0) {
@@ -49,7 +54,12 @@ app.post('/upload', upload.single('image'), async (req, res) => {
     // Step 2: Generate a caption using Gemini API based on the image labels
     const captionPrompt = `Generate a ${tone} caption based on the following image description: '${labels}', for the ${platform} platform. The caption should be ${length} in length.`;
     const captionResult = await genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const captionResponse = await captionResult.generateContent([captionPrompt]);
+    const captionResponse = await captionResult.generateContent([captionPrompt]).catch(error => {
+      if (error.message.includes('PERMISSION_DENIED')) {
+        throw new Error('API_CREDITS_EXHAUSTED');
+      }
+      throw error;
+    });
 
     if (!captionResponse || !captionResponse.response) {
       return res.status(500).json({ error: 'Failed to generate caption' });
@@ -79,12 +89,17 @@ app.post('/upload', upload.single('image'), async (req, res) => {
 
     res.json({
       caption: captionResponse.response.text(),
-      hashtags: hashtagResult.response.text().split(" "),  // Split hashtags into an array
-      tips: tipsResult.response.text().split(". "), // Split tips by period into an array
+      hashtags: hashtagResult.response.text().split(" "),
+      tips: tipsResult.response.text().split(". "),
     });
 
   } catch (error) {
     console.error('Error generating caption:', error);
+    if (error.message === 'API_CREDITS_EXHAUSTED') {
+      return res.status(503).json({ 
+        error: 'API credits are exhausted. Please check back later.' 
+      });
+    }
     res.status(500).json({ error: 'Failed to generate caption' });
   }
 });
