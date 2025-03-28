@@ -3,28 +3,111 @@ const multer = require('multer');
 const vision = require('@google-cloud/vision');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const cors = require('cors');
+const { Pool } = require('pg');
+const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const session = require('express-session');
 require('dotenv').config();
 
 const app = express();
 
-// Enable CORS for your frontend URL
-app.use(cors({ origin: 'http://localhost:3000' }));
+// Middleware
+app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
+app.use(express.json());
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your_session_secret', // Set in .env
+  resave: false,
+  saveUninitialized: false,
+}));
+app.use(passport.initialize());
+app.use(passport.session());
 
-// Configure Multer to store uploaded images in memory as buffers
+// PostgreSQL Connection Pool
+const pool = new Pool({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_DATABASE,
+  port: process.env.DB_PORT,
+});
+
+pool.connect()
+  .then(() => console.log('Connected to PostgreSQL database'))
+  .catch(err => console.error('PostgreSQL connection error:', err));
+
+// Passport Google OAuth Strategy
+passport.use(new GoogleStrategy({
+  clientID: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  callbackURL: 'http://localhost:5001/auth/google/callback',
+}, async (accessToken, refreshToken, profile, done) => {
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE google_id = $1', [profile.id]);
+    if (result.rows.length > 0) {
+      return done(null, result.rows[0]);
+    }
+    const insertResult = await pool.query(
+      'INSERT INTO users (google_id, email, name) VALUES ($1, $2, $3) RETURNING *',
+      [profile.id, profile.emails[0].value, profile.displayName]
+    );
+    return done(null, insertResult.rows[0]);
+  } catch (err) {
+    return done(err);
+  }
+}));
+
+passport.serializeUser((user, done) => done(null, user.id));
+passport.deserializeUser(async (id, done) => {
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+    done(null, result.rows[0]);
+  } catch (err) {
+    done(err);
+  }
+});
+
+// Multer Config
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-app.use(express.json());
-
-// Initialize Google Cloud Vision client
+// Google Cloud Vision and Gemini Clients
 const visionClient = new vision.ImageAnnotatorClient();
-
-// Initialize Google Generative AI client (Gemini)
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Route to handle image upload, image analysis, and caption generation
-app.post('/upload', upload.single('image'), async (req, res) => {
+// Authentication Middleware
+const ensureAuthenticated = (req, res, next) => {
+  if (req.isAuthenticated()) return next();
+  res.status(401).json({ error: 'Please log in to access this resource' });
+};
+
+// OAuth Routes
+app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+
+app.get('/auth/google/callback',
+  passport.authenticate('google', { failureRedirect: 'http://localhost:3000' }),
+  (req, res) => {
+    res.redirect('http://localhost:3000');
+  }
+);
+
+app.get('/auth/logout', (req, res) => {
+  req.logout(() => {
+    res.redirect('http://localhost:3000');
+  });
+});
+
+app.get('/auth/user', (req, res) => {
+  if (req.user) {
+    res.json({ user: { name: req.user.name, email: req.user.email } });
+  } else {
+    res.json({ user: null });
+  }
+});
+
+// Caption Generation Route
+app.post('/upload', ensureAuthenticated, upload.single('image'), async (req, res) => {
   const { platform, length, tone, description } = req.body;
+  const userGoogleId = req.user.google_id;
 
   try {
     if (!req.file || !req.file.buffer) {
@@ -34,7 +117,6 @@ app.post('/upload', upload.single('image'), async (req, res) => {
     const imageBuffer = req.file.buffer;
     console.log("Image uploaded:", req.file.originalname);
 
-    // Step 1: Analyze the image using Google Cloud Vision API
     const [visionResult] = await visionClient.labelDetection({
       image: { content: imageBuffer },
     }).catch(error => {
@@ -49,9 +131,7 @@ app.post('/upload', upload.single('image'), async (req, res) => {
     }
 
     const labels = visionResult.labelAnnotations.map(label => label.description).join(', ');
-    console.log('Labels extracted from image:', labels);
 
-    // Step 2: Generate a caption using Gemini API based on the image labels
     const captionPrompt = `Generate a ${tone} caption based on the following image description: '${labels}', for the ${platform} platform. The caption should be ${length} in length.`;
     const captionResult = await genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const captionResponse = await captionResult.generateContent([captionPrompt]).catch(error => {
@@ -65,40 +145,34 @@ app.post('/upload', upload.single('image'), async (req, res) => {
       return res.status(500).json({ error: 'Failed to generate caption' });
     }
 
-    console.log("Caption generated:", captionResponse.response.text());
+    const captionText = captionResponse.response.text();
 
-    // Generate hashtags based on the caption
-    const hashtagPrompt = `Generate a list of relevant hashtags for the following caption. Only provide the hashtags: '${captionResponse.response.text()}'.`;
+    const hashtagPrompt = `Generate a list of relevant hashtags for the following caption. Only provide the hashtags: '${captionText}'.`;
     const hashtagResult = await captionResult.generateContent([hashtagPrompt]);
+    const hashtagsText = hashtagResult.response.text();
 
-    if (!hashtagResult || !hashtagResult.response) {
-      return res.status(500).json({ error: 'Failed to generate hashtags' });
-    }
-
-    console.log("Hashtags generated:", hashtagResult.response.text());
-
-    // Step 3: Generate tips for improving social media captions
-    const tipsPrompt = `Provide just a list of tips only on how to improve this caption for ${platform}: '${captionResponse.response.text()}'. Only provide the tips.`;
+    const tipsPrompt = `Provide just a list of tips only on how to improve this caption for ${platform}: '${captionText}'. Only provide the tips.`;
     const tipsResult = await captionResult.generateContent([tipsPrompt]);
+    const tipsText = tipsResult.response.text();
 
-    if (!tipsResult || !tipsResult.response) {
-      return res.status(500).json({ error: 'Failed to generate tips' });
-    }
+    const userQuery = await pool.query('SELECT id FROM users WHERE google_id = $1', [userGoogleId]);
+    const userId = userQuery.rows[0].id;
 
-    console.log("Tips generated:", tipsResult.response.text());
+    await pool.query(
+      'INSERT INTO captions (user_id, platform, caption, hashtags, tips) VALUES ($1, $2, $3, $4, $5)',
+      [userId, platform, captionText, hashtagsText, tipsText]
+    );
 
     res.json({
-      caption: captionResponse.response.text(),
-      hashtags: hashtagResult.response.text().split(" "),
-      tips: tipsResult.response.text().split(". "),
+      caption: captionText,
+      hashtags: hashtagsText.split(" "),
+      tips: tipsText.split(". "),
     });
 
   } catch (error) {
     console.error('Error generating caption:', error);
     if (error.message === 'API_CREDITS_EXHAUSTED') {
-      return res.status(503).json({ 
-        error: 'API credits are exhausted. Please check back later.' 
-      });
+      return res.status(503).json({ error: 'API credits are exhausted. Please check back later.' });
     }
     res.status(500).json({ error: 'Failed to generate caption' });
   }
