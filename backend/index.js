@@ -15,7 +15,7 @@ const app = express();
 app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
 app.use(express.json());
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'your_session_secret', // Set in .env
+  secret: process.env.SESSION_SECRET || 'your_session_secret',
   resave: false,
   saveUninitialized: false,
 }));
@@ -84,15 +84,15 @@ const ensureAuthenticated = (req, res, next) => {
 app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
 app.get('/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: 'http://localhost:3000' }),
+  passport.authenticate('google', { failureRedirect: 'http://localhost:3000/landing' }),
   (req, res) => {
-    res.redirect('http://localhost:3000');
+    res.redirect('http://localhost:3000/landing');
   }
 );
 
 app.get('/auth/logout', (req, res) => {
   req.logout(() => {
-    res.redirect('http://localhost:3000');
+    res.redirect('http://localhost:3000/landing');
   });
 });
 
