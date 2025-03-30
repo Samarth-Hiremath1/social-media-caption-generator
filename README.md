@@ -4,6 +4,8 @@
 
 **PostPal** is a full-stack web application that empowers users to generate AI-powered captions, hashtags, and tips for social media platforms from uploaded images. Leveraging Google Cloud Vision API for image analysis and Google Gemini API for creative text generation, PostPal offers a seamless experience with secure user authentication via Google OAuth and persistent data storage in PostgreSQL. Users can customize captions by platform, tone, and length, all within a sleek, modern interface styled with Radix UI and Tailwind CSS.
 
+### I'm currently trying to host the project on Vercel! Check back soon for updates!
+
 ## Features
 
 - **Image Upload**: Upload an image to generate context-aware captions.
