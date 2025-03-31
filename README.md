@@ -2,7 +2,7 @@
 
 ## Overview
 
-**PostPal** is a full-stack web application that empowers users to generate AI-powered captions, hashtags, and tips for social media platforms from uploaded images. Leveraging Google Cloud Vision API for image analysis and Google Gemini API for creative text generation, PostPal offers a seamless experience with secure user authentication via Google OAuth and persistent data storage in PostgreSQL. Users can customize captions by platform, tone, and length, all within a sleek, modern interface styled with Radix UI and Tailwind CSS.
+**PostPal** is a full-stack web application that empowers users to generate AI-powered captions, hashtags, and tips for social media platforms from uploaded images. Leveraging **Google Cloud Vision API** for image analysis and **Google Gemini API** for creative text generation, PostPal offers a seamless experience with secure user authentication via **Google OAuth** and persistent data storage in **PostgreSQL**. Users can customize captions by platform, tone, and length, all within a sleek, modern interface styled with **React**, **Radix UI**, and **Tailwind CSS**.
 
 ### I'm currently trying to host the project on Vercel! Check back soon for updates!
 
@@ -20,10 +20,10 @@
 ## Tech Stack
 
 ### Frontend
-- **React.js** with **Next.js**: Powers the dynamic user interface.
-- **Tailwind CSS**: Provides responsive, modern styling.
-- **TypeScript**: Ensures type safety across the frontend.
-- **Radix UI**: Enhances accessibility and UI components (e.g., Dialog, Button).
+- **React.js** with **Next.js**
+- **Tailwind CSS**
+- **TypeScript**
+- **Radix UI**
 
 ### Backend
 - **Node.js** with **Express.js**: Handles API requests and server logic.
